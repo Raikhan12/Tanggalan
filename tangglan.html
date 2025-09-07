@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Kalender Agenda 2025-2026</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-6">
+  <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-4xl">
+    <div class="flex justify-between items-center mb-4">
+      <button onclick="prevMonth()" class="px-3 py-1 bg-gray-200 rounded-lg">⬅️</button>
+      <h1 id="calendarTitle" class="text-2xl font-bold text-center"></h1>
+      <button onclick="nextMonth()" class="px-3 py-1 bg-gray-200 rounded-lg">➡️</button>
+    </div>
+    <div class="grid grid-cols-7 gap-2 text-center font-semibold">
+      <div>Min</div>
+      <div>Sen</div>
+      <div>Sel</div>
+      <div>Rab</div>
+      <div>Kam</div>
+      <div>Jum</div>
+      <div>Sab</div>
+    </div>
+    <div id="calendar" class="grid grid-cols-7 gap-2 mt-2"></div>
+  </div>
+
+  <!-- Modal Tambah/Edit Agenda -->
+  <div id="agendaModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+    <div class="bg-white rounded-xl shadow-lg p-6 w-96">
+      <h2 id="modalTitle" class="text-lg font-bold mb-4">Tambah Agenda</h2>
+      <input type="hidden" id="selectedDate">
+      <input type="hidden" id="editIndex">
+      <textarea id="agendaText" class="w-full border rounded p-2 mb-4" rows="3" placeholder="Tulis agenda..."></textarea>
+      <div class="flex justify-end gap-2">
+        <button onclick="closeModal()" class="px-4 py-2 bg-gray-300 rounded-lg">Batal</button>
+        <button onclick="saveAgenda()" class="px-4 py-2 bg-blue-500 text-white rounded-lg">Simpan</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const calendarEl = document.getElementById("calendar");
+    const calendarTitle = document.getElementById("calendarTitle");
+    const modal = document.getElementById("agendaModal");
+    const modalTitle = document.getElementById("modalTitle");
+    const selectedDateInput = document.getElementById("selectedDate");
+    const editIndexInput = document.getElementById("editIndex");
+    const agendaText = document.getElementById("agendaText");
+
+    // mulai September 2025
+    let currentYear = 2025;
+    let currentMonth = 8; // 0=Januari, 8=September
+
+    let agendas = JSON.parse(localStorage.getItem("agendas_all")) || {};
+
+    const monthNames = [
+      "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+      "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+    ];
+
+    // ambil hari ini
+    const today = new Date();
+    const todayYear = today.getFullYear();
+    const todayMonth = today.getMonth();
+    const todayDate = today.getDate();
+
+    function renderCalendar() {
+      const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+      const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+
+      calendarTitle.innerText = `${monthNames[currentMonth]} ${currentYear}`;
+      calendarEl.innerHTML = "";
+
+      // kosong sebelum tanggal 1
+      for (let i = 0; i < firstDay; i++) {
+        calendarEl.innerHTML += `<div class="p-4"></div>`;
+      }
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dateKey = `${currentYear}-${currentMonth+1}-${d}`;
+        const agendaList = agendas[dateKey] || [];
+
+        let agendaHTML = "";
+        if (agendaList.length > 0) {
+          agendaHTML = agendaList.map((a, idx) => `
+            <div class="text-xs mt-1 bg-blue-200 text-blue-800 rounded px-1 flex justify-between items-center">
+              <span>${a}</span>
+              <div class="flex gap-1">
+                <button onclick="editAgenda(event, '${dateKey}', ${idx})" class="text-green-600 hover:text-green-800">✏️</button>
+                <button onclick="deleteAgenda(event, '${dateKey}', ${idx})" class="text-red-600 hover:text-red-800">❌</button>
+              </div>
+            </div>
+          `).join("");
+        }
+
+        // cek apakah ini hari ini
+        const isToday = (currentYear === todayYear && currentMonth === todayMonth && d === todayDate);
+        const todayClass = isToday ? "bg-yellow-200 border-yellow-500" : "";
+
+        calendarEl.innerHTML += `
+          <div class="p-2 border rounded-lg cursor-pointer hover:bg-blue-100 transition relative ${todayClass}">
+            <div class="font-bold" onclick="openModal('${dateKey}')">${d}</div>
+            ${agendaHTML}
+          </div>`;
+      }
+    }
+
+    function openModal(dateKey) {
+      selectedDateInput.value = dateKey;
+      editIndexInput.value = "";
+      agendaText.value = "";
+      modalTitle.innerText = "Tambah Agenda";
+      modal.classList.remove("hidden");
+    }
+
+    function editAgenda(event, dateKey, idx) {
+      event.stopPropagation();
+      selectedDateInput.value = dateKey;
+      editIndexInput.value = idx;
+      agendaText.value = agendas[dateKey][idx];
+      modalTitle.innerText = "Edit Agenda";
+      modal.classList.remove("hidden");
+    }
+
+    function closeModal() {
+      modal.classList.add("hidden");
+      agendaText.value = "";
+    }
+
+    function saveAgenda() {
+      const dateKey = selectedDateInput.value;
+      const idx = editIndexInput.value;
+      const text = agendaText.value.trim();
+
+      if (!text) {
+        closeModal();
+        return;
+      }
+
+      if (idx === "") {
+        if (!agendas[dateKey]) agendas[dateKey] = [];
+        agendas[dateKey].push(text);
+      } else {
+        agendas[dateKey][idx] = text;
+      }
+
+      localStorage.setItem("agendas_all", JSON.stringify(agendas));
+      renderCalendar();
+      closeModal();
+    }
+
+    function deleteAgenda(event, dateKey, idx) {
+      event.stopPropagation();
+      agendas[dateKey].splice(idx, 1);
+      if (agendas[dateKey].length === 0) delete agendas[dateKey];
+      localStorage.setItem("agendas_all", JSON.stringify(agendas));
+      renderCalendar();
+    }
+
+    function prevMonth() {
+      if (currentYear === 2025 && currentMonth === 8) return; // stop sebelum Sept 2025
+      currentMonth--;
+      if (currentMonth < 0) {
+        currentMonth = 11;
+        currentYear--;
+      }
+      renderCalendar();
+    }
+
+    function nextMonth() {
+      if (currentYear === 2026 && currentMonth === 11) return; // stop di Des 2026
+      currentMonth++;
+      if (currentMonth > 11) {
+        currentMonth = 0;
+        currentYear++;
+      }
+      renderCalendar();
+    }
+
+    renderCalendar();
+  </script>
+</body>
+</html>
